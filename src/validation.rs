@@ -1,11 +1,13 @@
+use rustls::{Certificate, RootCertStore, ServerCertVerified, ServerCertVerifier, TLSError};
+use std::sync::Arc;
 use webpki::DNSNameRef;
 use x509_parser::parse_x509_certificate;
 
 pub struct TOFUVerifier {}
 
 impl TOFUVerifier {
-    fn new() -> Arc<dyn ServerCertVerifier> {
-        Arc::new(TOFUVerifier {});
+    pub fn new() -> Arc<Self> {
+        Arc::new(TOFUVerifier {})
     }
 }
 
@@ -14,22 +16,18 @@ impl ServerCertVerifier for TOFUVerifier {
         &self,
         _: &RootCertStore,
         presented_certs: &[Certificate],
-        dns_name: DNSNameRef,
+        _hostname: DNSNameRef,
         _: &[u8],
     ) -> Result<ServerCertVerified, TLSError> {
-        for cert in presented_certs.into_iter() {
-            let result = parse_x509_certificate(cert);
-            match result {
-                Ok((rem, cert)) => {
-                    assert!(rem.is_empty());
-                    let subject = &cert.tbs_certificate.subject;
-                    let issuer = &cert.tbs_certificate.issuer;
-                    let valid = &cert.tbs_certificate.validity.not_after;
-                    println!("Subject: {}", subject);
-                    println!("Issuer: {}", issuer, valid);
-                }
-                _ => panic!("parsing failed! {:?}", res),
+        let cert = &presented_certs[0];
+        let result = parse_x509_certificate(cert.as_ref());
+        match result {
+            Ok((rem, cert)) => {
+                assert!(rem.is_empty());
+                println! {"Certificate {:#?}", cert}
             }
+            _ => panic!("parsing failed! {:?}", result),
         }
+        Ok(ServerCertVerified::assertion())
     }
 }
