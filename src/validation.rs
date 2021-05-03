@@ -75,10 +75,14 @@ impl CertificateMap {
             .verify_signature(None)
             .map_err(|_| TLSError::WebPKIError(webpki::Error::InvalidSignatureForPublicKey))?;
 
-        // TODO: check against certificate we've saved if they exists for this hostname.
-
-        // TODO: get fingerprint and insert certificate into our map to save otherwise.
         let fingerprint = ring::digest::digest(&digest::SHA256, der_encoded_cert);
+        CertificateMap::match_certificate(
+            self,
+            hostname.as_str(),
+            fingerprint.as_ref(),
+            der_parsed_cert,
+        );
+
         Ok(ServerCertVerified::assertion())
     }
     fn verify_expiry(parsed_cert: &X509Certificate) -> Result<(), TLSError> {
@@ -93,22 +97,31 @@ impl CertificateMap {
         new_fingerprint: &[u8],
         new_cert: &X509Certificate,
     ) {
+        let new_fingerprint = std::str::from_utf8(new_fingerprint)
+            .expect("unable to convert certificate fingerprint to string!");
         if let Some(cert) = self.stored_certificates.get_mut(hostname) {
-            // TODO: invert conditions!!
-            // unwrap because it will always be valid
-            if std::str::from_utf8(new_fingerprint).unwrap() != cert.fingerprint {
-                // if not, is the stored certificate expired?
-                if ASN1Time::now() >= ASN1Time::from_timestamp(cert.not_after) {
-                    // update stored cert with new certificate
-                    *cert = StoredCertificate {
-                        fingerprint: std::str::from_utf8(new_fingerprint).unwrap().to_string(),
-                        not_after: new_cert.validity().not_after.timestamp(),
-                    };
-                } else {
-                    // TODO: show the user a warning! this certificate might be dodgy
-                }
+            if new_fingerprint == cert.fingerprint {
+                return;
             }
+            // if not, is the stored certificate expired?
+            if ASN1Time::now() < ASN1Time::from_timestamp(cert.not_after) {
+                // TODO: show the user a warning! this certificate might be dodgy
+            } else {
+                // update stored cert with new certificate
+                *cert = StoredCertificate {
+                    fingerprint: new_fingerprint.to_owned(),
+                    not_after: new_cert.validity().not_after.timestamp(),
+                };
+            }
+            return;
         }
+        self.stored_certificates.insert(
+            hostname.to_lowercase(),
+            StoredCertificate {
+                fingerprint: new_fingerprint.to_owned(),
+                not_after: new_cert.validity().not_after.timestamp(),
+            },
+        );
     }
 }
 pub struct TOFUVerifier {
