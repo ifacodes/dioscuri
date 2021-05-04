@@ -1,4 +1,5 @@
 use anyhow::Result;
+use data_encoding::HEXUPPER;
 use ring::digest;
 use rustls::{Certificate, RootCertStore, ServerCertVerified, ServerCertVerifier, TLSError};
 use std::{
@@ -75,13 +76,11 @@ impl CertificateMap {
             .verify_signature(None)
             .map_err(|_| TLSError::WebPKIError(webpki::Error::InvalidSignatureForPublicKey))?;
 
-        let fingerprint = ring::digest::digest(&digest::SHA256, der_encoded_cert);
-        CertificateMap::match_certificate(
-            self,
-            hostname.as_str(),
-            fingerprint.as_ref(),
-            der_parsed_cert,
-        );
+        let fingerprint =
+            HEXUPPER.encode(ring::digest::digest(&digest::SHA256, der_encoded_cert).as_ref());
+        CertificateMap::match_certificate(self, hostname.as_str(), fingerprint, der_parsed_cert);
+
+        CertificateMap::save_to_file(self);
 
         Ok(ServerCertVerified::assertion())
     }
@@ -94,11 +93,9 @@ impl CertificateMap {
     fn match_certificate(
         &mut self,
         hostname: &str,
-        new_fingerprint: &[u8],
+        new_fingerprint: String,
         new_cert: &X509Certificate,
     ) {
-        let new_fingerprint = std::str::from_utf8(new_fingerprint)
-            .expect("unable to convert certificate fingerprint to string!");
         if let Some(cert) = self.stored_certificates.get_mut(hostname) {
             if new_fingerprint == cert.fingerprint {
                 return;
@@ -106,6 +103,7 @@ impl CertificateMap {
             // if not, is the stored certificate expired?
             if ASN1Time::now() < ASN1Time::from_timestamp(cert.not_after) {
                 // TODO: show the user a warning! this certificate might be dodgy
+                println!("Certificate Might Be Dodgy!");
             } else {
                 // update stored cert with new certificate
                 *cert = StoredCertificate {

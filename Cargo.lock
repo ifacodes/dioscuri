@@ -133,6 +133,7 @@ name = "gem"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "data-encoding",
  "directories-next",
  "lazy_static",
  "ring",
