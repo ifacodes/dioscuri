@@ -1,4 +1,4 @@
-use crate::ui::Key;
+use crate::ui::Input;
 use crossterm::event::{self, poll, read};
 use std::sync::mpsc;
 use std::thread;
@@ -10,21 +10,21 @@ pub enum Event<I> {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Config {
-    pub exit_key: Key,
+    pub exit_key: Input,
     pub tick_rate: Duration,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
-            exit_key: Key::Char('q'),
+            exit_key: Input::Char('q'),
             tick_rate: Duration::from_millis(250),
         }
     }
 }
 pub struct Events {
-    rx: mpsc::Receiver<Event<Key>>,
-    _tx: mpsc::Sender<Event<Key>>,
+    rx: mpsc::Receiver<Event<Input>>,
+    _tx: mpsc::Sender<Event<Input>>,
 }
 
 impl Events {
@@ -41,9 +41,9 @@ impl Events {
         thread::spawn(move || loop {
             if poll(config.tick_rate).unwrap() {
                 if let event::Event::Key(key) = read().unwrap() {
-                    let key = Key::from(key);
+                    let input = Input::from(key);
 
-                    event_tx.send(Event::Input(key)).unwrap();
+                    event_tx.send(Event::Input(input)).unwrap();
                 }
             }
             event_tx.send(Event::Tick).unwrap();
@@ -52,7 +52,7 @@ impl Events {
         Events { rx, _tx: tx }
     }
 
-    pub fn next(&self) -> Result<Event<Key>, mpsc::RecvError> {
+    pub fn next(&self) -> Result<Event<Input>, mpsc::RecvError> {
         self.rx.recv()
     }
 }

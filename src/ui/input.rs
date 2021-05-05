@@ -1,7 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum Key {
+pub enum Input {
     Enter,
     Left,
     Right,
@@ -16,52 +16,52 @@ pub enum Key {
     Unknown,
 }
 
-impl From<KeyEvent> for Key {
+impl From<KeyEvent> for Input {
     fn from(key_event: KeyEvent) -> Self {
         match key_event {
             KeyEvent {
                 code: KeyCode::Enter,
                 ..
-            } => Key::Enter,
+            } => Input::Enter,
             KeyEvent {
                 code: KeyCode::Left,
                 ..
-            } => Key::Left,
+            } => Input::Left,
             KeyEvent {
                 code: KeyCode::Right,
                 ..
-            } => Key::Right,
+            } => Input::Right,
             KeyEvent {
                 code: KeyCode::Up, ..
-            } => Key::Up,
+            } => Input::Up,
             KeyEvent {
                 code: KeyCode::Down,
                 ..
-            } => Key::Down,
+            } => Input::Down,
             KeyEvent {
                 code: KeyCode::PageUp,
                 ..
-            } => Key::PageUp,
+            } => Input::PageUp,
             KeyEvent {
                 code: KeyCode::PageDown,
                 ..
-            } => Key::PageDown,
+            } => Input::PageDown,
             KeyEvent {
                 code: KeyCode::Esc, ..
-            } => Key::Esc,
+            } => Input::Esc,
             KeyEvent {
                 code: KeyCode::Char(c),
                 modifiers: KeyModifiers::ALT,
-            } => Key::Alt(c),
+            } => Input::Alt(c),
             KeyEvent {
                 code: KeyCode::Char(c),
                 modifiers: KeyModifiers::CONTROL,
-            } => Key::Ctrl(c),
+            } => Input::Ctrl(c),
             KeyEvent {
                 code: KeyCode::Char(c),
                 ..
-            } => Key::Char(c),
-            _ => Key::Unknown,
+            } => Input::Char(c),
+            _ => Input::Unknown,
         }
     }
 }
