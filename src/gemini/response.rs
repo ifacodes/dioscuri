@@ -1,3 +1,4 @@
+use super::Page;
 use anyhow::{anyhow, Result};
 use std::str::FromStr;
 
@@ -49,7 +50,7 @@ impl FromStr for Status {
             "60" => Ok(Status::ClientCertificateRequried),
             "61" => Ok(Status::CertificateNotAuthorised),
             "62" => Ok(Status::CertificateNotValid),
-            _ => Err(anyhow!("Not a valid Status Code: {}", s)),
+            _ => Err(anyhow!("Not a valid status sode: {}", s)),
         }
     }
 }
@@ -68,11 +69,11 @@ impl FromStr for ResponseHeader {
 
         let status = header
             .get(0)
-            .ok_or(anyhow!("Response Header is missing Status Code!"))?
+            .ok_or(anyhow!("Response Header is missing status sode!"))?
             .parse()?;
         let meta = header
             .get(1)
-            .ok_or(anyhow!("Response Header is missing Meta!"))?;
+            .ok_or(anyhow!("Response Header is missing meta!"))?;
 
         Ok(ResponseHeader {
             status,
@@ -83,5 +84,5 @@ impl FromStr for ResponseHeader {
 
 pub struct Response {
     pub header: ResponseHeader,
-    pub page: String,
+    pub page: Page,
 }
