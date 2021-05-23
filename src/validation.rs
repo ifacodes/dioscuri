@@ -61,6 +61,9 @@ impl CertificateMap {
                 "{};{};{}\n",
                 host, cert.fingerprint, cert.not_after
             ));
+            if let Some(dir) = self.path_to_file.parent() {
+                std::fs::create_dir_all(dir).unwrap();
+            }
         }
         std::fs::write(&self.path_to_file, contents).expect("unable to save certificates to store!")
     }

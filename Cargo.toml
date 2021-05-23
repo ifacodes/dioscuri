@@ -15,5 +15,11 @@ ring = "0.16.20"
 directories-next = "2.0.0"
 lazy_static = "1.4.0"
 data-encoding = "2.3.2"
-crossterm = "0.19"
-tui = { version = "0.15", default-features = false, features = ["crossterm"]}
+env_logger = "0.8.3"
+log = "0.4.14"
+pancurses = "0.16.1"
+
+[dependencies.cursive]
+version = "0.16"
+default-features = false
+features = ["crossterm-backend"]

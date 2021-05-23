@@ -11,10 +11,16 @@ pub struct App {
 
 impl Default for App {
     fn default() -> Self {
-        App {
+        Self {
             url: "gemini://gemini.circumlunar.space/".to_owned(),
             input_mode: InputMode::NoInput,
             previous_urls: Vec::new(),
         }
+    }
+}
+
+impl App {
+    pub fn update_url(&mut self, new_url: String) {
+        self.url = new_url;
     }
 }
