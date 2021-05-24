@@ -5,6 +5,8 @@ mod validation;
 #[macro_use]
 extern crate lazy_static;
 
+use std::sync::{Arc, Mutex};
+
 use anyhow::Result;
 use app::App;
 use cursive::{
@@ -15,69 +17,12 @@ use cursive::{
     view::{Boxable, Identifiable, SizeConstraint},
     views::{
         BoxView, Button, Dialog, DummyView, EditView, FixedLayout, LinearLayout, PaddedView, Panel,
-        ResizedView, ScrollView, TextArea, TextView,
+        ResizedView, ScrollView, TextArea, TextContent, TextView,
     },
-    Cursive, Rect,
+    Cursive, Rect, With,
 };
-use directories_next::ProjectDirs;
-use pancurses::{initscr, resize_term};
-use rustls::{ClientConfig, Session};
-use std::{
-    borrow::Cow,
-    io::{self, Read, Write},
-    sync::Arc,
-};
-use std::{net::TcpStream, path::PathBuf};
-use validation::TOFUVerifier;
-use webpki::DNSNameRef;
-
-lazy_static! {
-    static ref DIRECTORY: Option<ProjectDirs> = ProjectDirs::from("com", "ifa", "gem");
-    static ref SAVED_CERTS: PathBuf = DIRECTORY.clone().map_or_else(
-        || std::env::current_dir().unwrap(),
-        |d| d.data_dir().to_owned()
-    );
-}
 
 // FIXME: Move to seperate file!
-fn build_config<'a>() -> Result<Arc<ClientConfig>> {
-    let mut config = ClientConfig::new();
-    config
-        .dangerous()
-        .set_certificate_verifier(Arc::new(TOFUVerifier::new(&SAVED_CERTS)));
-    Ok(Arc::new(config))
-}
-
-// FIXME: Move to seperate file!
-#[allow(dead_code)]
-fn do_tls_stuff() -> String {
-    let rc_config = build_config().unwrap();
-    let gemini_test = DNSNameRef::try_from_ascii_str("gemini.circumlunar.space").unwrap();
-
-    let gemini_request = b"gemini://gemini.circumlunar.space/servers/\r\n";
-
-    let mut client = rustls::ClientSession::new(&rc_config, gemini_test);
-    let mut socket = TcpStream::connect("gemini.circumlunar.space:1965").unwrap();
-    let mut stream = rustls::Stream::new(&mut client, &mut socket);
-
-    stream.write(gemini_request).unwrap();
-
-    while client.wants_read() {
-        client.read_tls(&mut socket).unwrap();
-        client.process_new_packets().unwrap();
-    }
-    // FIXME: why does this not always return the page text?
-    let mut data = Vec::new();
-    let _ = client.read_to_end(&mut data);
-    let _status = String::from_utf8_lossy(&data);
-
-    client.read_tls(&mut socket).unwrap();
-    client.process_new_packets().unwrap();
-    let mut data = Vec::new();
-    let _ = client.read_to_end(&mut data);
-    let content = String::from_utf8_lossy(&data);
-    content.to_string()
-}
 
 fn button_without_brackets<S, F>(label: S, cb: F) -> Button
 where
@@ -95,8 +40,10 @@ fn url_submit(app: &mut App, input: &str) {
 
 pub fn main() -> Result<()> {
     env_logger::init();
-    let app = App::default();
-
+    let app = Arc::new(Mutex::new(App::default()));
+    {
+        app.lock().unwrap().fetch_page();
+    }
     let top_bar = PaddedView::lrtb(
         2,
         3,
@@ -104,10 +51,16 @@ pub fn main() -> Result<()> {
         1,
         LinearLayout::horizontal()
             .child(Panel::new(
-                button_without_brackets("<--", |e| {}).with_name("back_button"),
+                button_without_brackets("<--", |c| {
+                    c.with_user_data(|_data: &mut App| todo!());
+                })
+                .with_name("back_button"),
             ))
             .child(Panel::new(
-                button_without_brackets("-->", |e| {}).with_name("forward_button"),
+                button_without_brackets("-->", |c| {
+                    c.with_user_data(|_data: &mut App| todo!());
+                })
+                .with_name("forward_button"),
             ))
             .child(PaddedView::lrtb(
                 2,
@@ -127,11 +80,17 @@ pub fn main() -> Result<()> {
             )),
     );
 
-    let page_view = PaddedView::lrtb(2, 2, 1, 3, TextView::new(do_tls_stuff()).scrollable());
+    let page_view = PaddedView::lrtb(
+        2,
+        2,
+        1,
+        3,
+        TextView::new(&app.lock().unwrap().page).scrollable(),
+    );
 
     let mut siv = cursive::default();
 
-    siv.set_user_data(app);
+    siv.set_user_data(app.clone());
 
     siv.add_fullscreen_layer(
         LinearLayout::vertical()
@@ -145,9 +104,11 @@ pub fn main() -> Result<()> {
     siv.add_global_callback(Key::Esc, |c| {
         // When the user presses Escape, update the output view
         // with the contents of the input view.
-        c.find_name::<EditView>("urlbar")
-            .unwrap()
-            .set_content(&c.user_data::<App>().expect("FUCK").url);
+        c.with_user_data(|data: &mut Arc<Mutex<App>>| {
+            let mut locked = data.lock().unwrap();
+            locked.update_url(String::from("gemini.circumlunar.space/servers"));
+            locked.fetch_page2();
+        });
     });
 
     siv.run();
